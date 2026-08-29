@@ -1,0 +1,23 @@
+[package]
+name = "qanda-shell-system-backend"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+notify = "8.2"
+nvml-wrapper = "0.11"
+rustix = { version = "1.0", features = ["fs", "process"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.47", features = ["io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+zbus = { version = "5.11", default-features = false, features = ["tokio"] }
+
+[profile.release]
+strip = true
+lto = "thin"
+
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+all = "deny"

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+set -o pipefail
+
+cliphist list | jq -Rsc '
+    split("\n")
+    | map(
+        select(length > 0)
+        | capture("^(?<id>[^\\t]+)\\t(?<preview>.*)$")
+        | {
+            id: .id,
+            preview: .preview,
+            binary: (.preview | startswith("[[ binary data"))
+        }
+    )
+    | .[:80]
+'

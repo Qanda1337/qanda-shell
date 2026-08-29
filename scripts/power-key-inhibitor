@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+exec systemd-inhibit \
+    --what=handle-power-key \
+    --who=qanda-shell \
+    --why="Hyprland handles the power key through qanda-shell" \
+    --mode=block \
+    bash -c 'while pgrep -x Hyprland >/dev/null; do sleep 2; done'

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+expression="${1:-}"
+[[ -n "$expression" && ${#expression} -le 256 ]] || exit 2
+
+set +e
+result="$(qalc -t -m 500 -n -nocurrencies -nodatasets -- "$expression")"
+status=$?
+set -e
+
+[[ -n "$result" ]] || exit "$status"
+printf '%s\n' "$result"

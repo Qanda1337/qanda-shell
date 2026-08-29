@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+config="${XDG_CONFIG_HOME:-$HOME/.config}/waypaper/config.ini"
+folder="$(sed -n 's/^folder[[:space:]]*=[[:space:]]*//p' "$config" | head -n 1)"
+folder="${folder/#\~/$HOME}"
+current="$(waypaper --list 2>/dev/null | jq -r '.[0].wallpaper // ""')"
+
+mapfile -t wallpapers < <(
+    fd --type f --max-depth 1 \
+        --extension jpg --extension jpeg --extension png --extension webp --extension avif \
+        . "$folder" | sort
+)
+
+jq -cn --arg current "$current" \
+    '{current:$current, wallpapers:$ARGS.positional}' \
+    --args "${wallpapers[@]}"

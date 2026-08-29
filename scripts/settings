@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+umask 077
+
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/qanda-shell"
+settings_file="$state_dir/settings.json"
+
+defaults() {
+    jq -n '{
+        activeProfile: "normal",
+        animationsEnabled: true,
+        animationSpeed: 1,
+        effectsEnabled: true,
+        notificationDuration: 4000,
+        showLeftCluster: true,
+        showRightCluster: true,
+        themeSource: "matugen",
+        themePreset: "catppuccin-mocha",
+        matugenSource: "wallpaper",
+        matugenColor: "#cbc6bf",
+        matugenScheme: "scheme-content",
+        matugenContrast: 0,
+        matugenPrefer: "saturation",
+        weatherCity: "",
+        weatherLatitude: "",
+        weatherLongitude: "",
+        weatherTimezone: "auto",
+        tronAddress: "",
+        hyperliquidAddress: ""
+    }'
+}
+
+mkdir -p "$state_dir"
+
+case "${1:-}" in
+    read)
+        if [[ -f "$settings_file" ]] && jq -e 'type == "object"' "$settings_file" >/dev/null 2>&1; then
+            jq -s '.[0] * .[1]' <(defaults) "$settings_file"
+        else
+            defaults
+        fi
+        ;;
+    write)
+        [[ $# == 2 ]] || exit 2
+        jq -e '
+            type == "object" and
+            (.activeProfile | IN("normal", "work", "game", "focus")) and
+            (.animationsEnabled | type == "boolean") and
+            (.animationSpeed | type == "number" and . >= 0.5 and . <= 2) and
+            (.effectsEnabled | type == "boolean") and
+            (.notificationDuration | type == "number" and floor == . and . >= 1000 and . <= 15000) and
+            (.showLeftCluster | type == "boolean") and
+            (.showRightCluster | type == "boolean") and
+            (.themeSource | IN("matugen", "preset")) and
+            (.themePreset | IN("catppuccin-mocha", "gruvbox-dark", "kanagawa-wave", "tokyo-night", "nord", "rose-pine", "everforest", "dracula")) and
+            (.matugenSource | IN("wallpaper", "color")) and
+            (.matugenColor | type == "string" and test("^#[0-9a-fA-F]{6}$")) and
+            (.matugenScheme | IN("scheme-content", "scheme-expressive", "scheme-fidelity", "scheme-fruit-salad", "scheme-monochrome", "scheme-neutral", "scheme-rainbow", "scheme-tonal-spot", "scheme-vibrant")) and
+            (.matugenContrast | type == "number" and . >= -1 and . <= 1) and
+            (.matugenPrefer | IN("darkness", "lightness", "saturation", "less-saturation", "value")) and
+            (.weatherCity | type == "string" and length <= 80 and (test("[:\\x00-\\x1f\\x7f]") | not)) and
+            (.weatherLatitude | type == "string" and (. == "" or (test("^-?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)$") and (tonumber >= -90 and tonumber <= 90)))) and
+            (.weatherLongitude | type == "string" and (. == "" or (test("^-?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)$") and (tonumber >= -180 and tonumber <= 180)))) and
+            (.weatherTimezone | type == "string" and test("^(auto|[A-Za-z_+-]+(/[A-Za-z0-9_+.-]+)*)$")) and
+            (.tronAddress | type == "string" and (. == "" or test("^T[1-9A-HJ-NP-Za-km-z]{33}$"))) and
+            (.hyperliquidAddress | type == "string" and (. == "" or test("^0x[0-9a-fA-F]{40}$")))
+        ' <<< "$2" >/dev/null || exit 2
+
+        temporary="$(mktemp "$state_dir/settings.XXXXXX")"
+        trap 'rm -f "$temporary"' EXIT
+        if [[ -f "$settings_file" ]] && jq -e 'type == "object"' "$settings_file" >/dev/null 2>&1; then
+            jq -s '.[0] * .[1] | .matugenColor |= ascii_downcase' \
+                "$settings_file" <(jq . <<< "$2") > "$temporary"
+        else
+            jq '.matugenColor |= ascii_downcase' <<< "$2" > "$temporary"
+        fi
+        mv "$temporary" "$settings_file"
+        trap - EXIT
+        ;;
+    *)
+        exit 2
+        ;;
+esac

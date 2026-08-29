@@ -1,0 +1,3 @@
+module Qanda.Config
+singleton Theme 1.0 Theme.qml
+singleton Preferences 1.0 Preferences.qml

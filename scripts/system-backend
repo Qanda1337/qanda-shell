@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+manifest="$root/backend/Cargo.toml"
+binary="$root/backend/target/release/qanda-shell-system-backend"
+
+if [[ ! -f "$manifest" ]]; then
+    printf 'system-backend: Cargo manifest not found: %s\n' "$manifest" >&2
+    exit 1
+fi
+
+rebuild=false
+if [[ ! -x "$binary" ]]; then
+    rebuild=true
+elif [[ "$manifest" -nt "$binary" || "$root/backend/Cargo.lock" -nt "$binary" ]]; then
+    rebuild=true
+elif [[ -n $(find "$root/backend/src" -type f -name '*.rs' -newer "$binary" -print -quit) ]]; then
+    rebuild=true
+fi
+
+if [[ "$rebuild" == true ]]; then
+    printf 'system-backend: building release binary\n' >&2
+    cargo build --release --manifest-path "$manifest" >&2
+fi
+
+if [[ ! -x "$binary" ]]; then
+    printf 'system-backend: release binary is missing after build: %s\n' "$binary" >&2
+    exit 1
+fi
+
+exec "$binary" --accent-file "$root/config/accent-color"

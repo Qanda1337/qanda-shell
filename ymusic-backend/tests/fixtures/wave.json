@@ -1,0 +1,10 @@
+{
+  "radioSessionId": "session-fixture",
+  "batchId": "batch-fixture",
+  "wave": {"idForFrom": "fixture-from"},
+  "sequence": [
+    {"type": "track", "liked": true, "track": {"id": "1", "title": "One", "albums": [{"id": "10"}]}},
+    {"type": "track", "liked": false, "track": {"id": "1", "title": "Duplicate", "albums": [{"id": "10"}]}},
+    {"type": "track", "liked": false, "track": {"id": "2", "title": "Two"}}
+  ]
+}

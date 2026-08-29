@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+
+set -u
+umask 077
+
+city="${1:-}"
+latitude="${2:-}"
+longitude="${3:-}"
+timezone="${4:-auto}"
+
+if [[ -z "$city" || ! "$latitude" =~ ^-?([0-9]+([.][0-9]*)?|[.][0-9]+)$ \
+        || ! "$longitude" =~ ^-?([0-9]+([.][0-9]*)?|[.][0-9]+)$ \
+        || ! "$timezone" =~ ^(auto|[A-Za-z_+-]+(/[A-Za-z0-9_+.-]+)*)$ ]]; then
+    jq -cn '{text: "󰖐 --°", tooltip: "Укажите геолокацию в Control Center", class: "unavailable"}'
+    exit
+fi
+
+if ! jq -en --arg latitude "$latitude" --arg longitude "$longitude" \
+        '($latitude | tonumber) >= -90 and ($latitude | tonumber) <= 90
+        and ($longitude | tonumber) >= -180 and ($longitude | tonumber) <= 180' >/dev/null; then
+    jq -cn '{text: "󰖐 --°", tooltip: "Некорректные координаты", class: "unavailable"}'
+    exit
+fi
+
+cache="${XDG_CACHE_HOME:-$HOME/.cache}/qanda-weather-${latitude}_${longitude}.json"
+
+weather_details() {
+    case "$1" in
+        0) icon="󰖙"; condition="Ясно" ;;
+        1|2) icon="󰖕"; condition="Переменная облачность" ;;
+        3) icon="󰖐"; condition="Облачно" ;;
+        45|48) icon="󰖑"; condition="Туман" ;;
+        51|53|55|56|57) icon="󰖗"; condition="Морось" ;;
+        61|63|65|66|67|80|81|82) icon="󰖖"; condition="Дождь" ;;
+        71|73|75|77|85|86) icon="󰖘"; condition="Снег" ;;
+        95|96|99) icon="󰙾"; condition="Гроза" ;;
+        *) icon="󰖐"; condition="Погода" ;;
+    esac
+}
+
+mkdir -p "${cache%/*}"
+if data="$(curl --fail --silent --show-error --max-time 8 --get \
+        --data-urlencode "latitude=$latitude" \
+        --data-urlencode "longitude=$longitude" \
+        --data-urlencode 'current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m' \
+        --data-urlencode 'daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max' \
+        --data-urlencode 'forecast_days=7' \
+        --data-urlencode "timezone=$timezone" \
+        'https://api.open-meteo.com/v1/forecast')"; then
+    printf '%s\n' "$data" > "$cache"
+elif [[ -s "$cache" ]]; then
+    data="$(<"$cache")"
+else
+    jq -cn --arg city "$city" '{text: "󰖐 --°", tooltip: ("Погода в " + $city + " недоступна"), class: "unavailable"}'
+    exit
+fi
+
+weather_details "$(jq -r '.current.weather_code' <<<"$data")"
+current_icon="$icon"
+current_condition="$condition"
+
+temperature="$(jq -r '.current.temperature_2m | round' <<<"$data")"
+apparent="$(jq -r '.current.apparent_temperature | round' <<<"$data")"
+wind="$(jq -r '.current.wind_speed_10m | round' <<<"$data")"
+printf -v tooltip '%s: %s · %s°C\nОщущается как %s°C · Ветер %s км/ч\n\nПрогноз на 7 дней' \
+    "$city" "$current_condition" "$temperature" "$apparent" "$wind"
+
+while IFS=$'\t' read -r date code minimum maximum precipitation; do
+    weather_details "$code"
+    day="$(LC_TIME=ru_RU.UTF-8 date -d "$date" '+%a %d.%m')"
+    printf -v tooltip '%s\n%-12s %s  %s…%s°C  󰖌 %s%%' \
+        "$tooltip" "$day" "$icon" "$minimum" "$maximum" "$precipitation"
+done < <(jq -r '.daily as $d | range(0; $d.time | length) | [
+    $d.time[.],
+    $d.weather_code[.],
+    ($d.temperature_2m_min[.] | round),
+    ($d.temperature_2m_max[.] | round),
+    ($d.precipitation_probability_max[.] // 0)
+] | @tsv' <<<"$data")
+
+jq -cn \
+    --arg text "<span size=\"large\">$current_icon</span> ${temperature}°" \
+    --arg tooltip "$tooltip" \
+    '{text: $text, tooltip: $tooltip}'

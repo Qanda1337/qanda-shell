@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+greeter_output_dir="/var/cache/qanda-greeter"
+sddm_output_dir="/var/cache/qanda-sddm"
+if [[ ! -w "$greeter_output_dir" && ! -w "$sddm_output_dir" ]]; then
+    exit 0
+fi
+
+wallpaper="${1:-}"
+if [[ -z "$wallpaper" ]]; then
+    wallpaper="$(waypaper --list 2>/dev/null | jq -r '.[0].wallpaper // empty')"
+fi
+wallpaper="${wallpaper/#\~/$HOME}"
+[[ -f "$wallpaper" ]] || exit 0
+
+if [[ -w "$greeter_output_dir" ]]; then
+    temporary="$(mktemp "$greeter_output_dir/.background.XXXXXX.jpg")"
+    trap 'rm -f "$temporary"' EXIT
+    magick "$wallpaper" -auto-orient \
+        -resize '2560x1440^' -gravity center -extent 2560x1440 \
+        -blur 0x24 -brightness-contrast '-8x-2' -quality 90 "$temporary"
+    chmod 644 "$temporary"
+    mv -f "$temporary" "$greeter_output_dir/background.jpg"
+    trap - EXIT
+fi
+
+if [[ -w "$sddm_output_dir" ]]; then
+    temporary="$(mktemp "$sddm_output_dir/.background.XXXXXX.jpg")"
+    trap 'rm -f "$temporary"' EXIT
+    magick "$wallpaper" -auto-orient -quality 95 "$temporary"
+    chmod 644 "$temporary"
+    mv -f "$temporary" "$sddm_output_dir/background.jpg"
+    trap - EXIT
+fi

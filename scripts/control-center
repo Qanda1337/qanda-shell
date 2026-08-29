@@ -1,0 +1,156 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+available() { command -v "$1" >/dev/null 2>&1; }
+
+status() {
+    local include_system="${1:-full}"
+    local wifi_available=false wifi_enabled=false wifi_name="" bluetooth_available=false bluetooth_enabled=false
+    local monitor_name="" monitor_description="" refresh_rate=0 scale=1
+    local brightness_available=false brightness=0 night_light_available=false night_light=false
+    local power_profiles_available=false power_profile="unavailable" camera_available=false
+    local available_power_profiles='[]'
+
+    if [[ "$include_system" == full ]] && available nmcli; then
+        nmcli -t -f TYPE device status 2>/dev/null | grep -q '^wifi$' && wifi_available=true
+        [[ "$(nmcli radio wifi 2>/dev/null || true)" == "enabled" ]] && wifi_enabled=true
+        wifi_name="$(nmcli -t -f NAME,TYPE connection show --active 2>/dev/null | awk -F: '$2 ~ /wireless|wifi/ {print $1; exit}')"
+    fi
+
+    if available rfkill && rfkill -n -o TYPE,SOFT 2>/dev/null | grep -q '^bluetooth'; then
+        bluetooth_available=true
+        rfkill -n -o TYPE,SOFT 2>/dev/null | grep -q '^bluetooth[[:space:]]\+unblocked' && bluetooth_enabled=true
+    fi
+
+    if available hyprctl; then
+        monitor_json="$(hyprctl monitors -j 2>/dev/null || printf '[]')"
+        monitor_name="$(jq -r 'map(select(.focused))[0].name // .[0].name // ""' <<< "$monitor_json")"
+        monitor_description="$(jq -r 'map(select(.focused))[0].description // .[0].description // ""' <<< "$monitor_json")"
+        refresh_rate="$(jq -r 'map(select(.focused))[0].refreshRate // .[0].refreshRate // 0' <<< "$monitor_json")"
+        scale="$(jq -r 'map(select(.focused))[0].scale // .[0].scale // 1' <<< "$monitor_json")"
+    fi
+
+    if available brightnessctl; then
+        brightness_available=true
+        brightness="$(brightnessctl -m 2>/dev/null | awk -F, '{gsub(/%/, "", $4); print $4 + 0}')"
+    elif available ddcutil; then
+        brightness_available=true
+        brightness="$(ddcutil getvcp 10 --terse 2>/dev/null | awk '{print int($4 * 100 / $5)}' || printf 0)"
+    fi
+
+    if available hyprsunset || available wlsunset; then
+        night_light_available=true
+        if pgrep -u "$UID" -x hyprsunset >/dev/null 2>&1 || pgrep -u "$UID" -x wlsunset >/dev/null 2>&1; then
+            night_light=true
+        fi
+    fi
+
+    if [[ "$include_system" == full ]] && available powerprofilesctl \
+            && power_profile="$(powerprofilesctl get 2>/dev/null)"; then
+        power_profiles_available=true
+        available_power_profiles="$(powerprofilesctl list 2>/dev/null \
+            | awk '/^[[:space:]]*\*?[[:space:]]*(power-saver|balanced|performance):/ {
+                line=$0; sub(/^[[:space:]]*\*?[[:space:]]*/, "", line); sub(/:.*/, "", line); print line
+              }' \
+            | jq -Rsc 'split("\n") | map(select(length > 0))')"
+    fi
+
+    compgen -G '/dev/video*' >/dev/null && camera_available=true
+
+    jq -n \
+        --argjson wifiAvailable "$wifi_available" \
+        --argjson wifiEnabled "$wifi_enabled" \
+        --arg wifiName "$wifi_name" \
+        --argjson bluetoothAvailable "$bluetooth_available" \
+        --argjson bluetoothEnabled "$bluetooth_enabled" \
+        --arg monitorName "$monitor_name" \
+        --arg monitorDescription "$monitor_description" \
+        --argjson refreshRate "$refresh_rate" \
+        --argjson scale "$scale" \
+        --argjson brightnessAvailable "$brightness_available" \
+        --argjson brightness "$brightness" \
+        --argjson nightLightAvailable "$night_light_available" \
+        --argjson nightLight "$night_light" \
+        --argjson powerProfilesAvailable "$power_profiles_available" \
+        --argjson availablePowerProfiles "$available_power_profiles" \
+        --arg powerProfile "$power_profile" \
+        --argjson cameraAvailable "$camera_available" \
+        --argjson nmcliAvailable "$(available nmcli && printf true || printf false)" \
+        --argjson pipewireAvailable "$(available wpctl && printf true || printf false)" \
+        --argjson hyprctlAvailable "$(available hyprctl && printf true || printf false)" \
+        --argjson cliphistAvailable "$(available cliphist && printf true || printf false)" \
+        --argjson waypaperAvailable "$(available waypaper && printf true || printf false)" \
+        --argjson qalcAvailable "$(available qalc && printf true || printf false)" \
+        '{wifiAvailable: $wifiAvailable, wifiEnabled: $wifiEnabled, wifiName: $wifiName,
+          bluetoothAvailable: $bluetoothAvailable, bluetoothEnabled: $bluetoothEnabled,
+          monitorName: $monitorName, monitorDescription: $monitorDescription,
+          refreshRate: $refreshRate, scale: $scale,
+          brightnessAvailable: $brightnessAvailable, brightness: $brightness,
+          nightLightAvailable: $nightLightAvailable, nightLight: $nightLight,
+          powerProfilesAvailable: $powerProfilesAvailable,
+          availablePowerProfiles: $availablePowerProfiles, powerProfile: $powerProfile,
+          cameraAvailable: $cameraAvailable,
+          dependencies: {nmcli: $nmcliAvailable, pipewire: $pipewireAvailable,
+            hyprctl: $hyprctlAvailable, cliphist: $cliphistAvailable,
+            waypaper: $waypaperAvailable, qalc: $qalcAvailable}}'
+}
+
+case "${1:-status}" in
+    status)
+        status
+        ;;
+    status-local)
+        status local
+        ;;
+    wifi)
+        available nmcli || exit 3
+        nmcli radio wifi "${2:?expected on or off}"
+        ;;
+    bluetooth)
+        available rfkill || exit 3
+        if [[ "${2:-}" == "on" ]]; then
+            rfkill unblock bluetooth
+        else
+            rfkill block bluetooth
+        fi
+        ;;
+    brightness)
+        if available brightnessctl; then
+            adjustment="${2:?expected adjustment}"
+            if [[ "$adjustment" =~ ^-([0-9]+)%$ ]]; then
+                adjustment="${BASH_REMATCH[1]}%-"
+            fi
+            brightnessctl set "$adjustment"
+        elif available ddcutil; then
+            current="$(ddcutil getvcp 10 --terse | awk '{print $4}')"
+            delta="${2%\%}"
+            target=$((current + delta))
+            ((target < 0)) && target=0
+            ((target > 100)) && target=100
+            ddcutil setvcp 10 "$target"
+        else
+            exit 3
+        fi
+        ;;
+    night-light)
+        if pgrep -u "$UID" -x hyprsunset >/dev/null 2>&1; then
+            pkill -x hyprsunset
+        elif pgrep -u "$UID" -x wlsunset >/dev/null 2>&1; then
+            pkill -x wlsunset
+        elif available hyprsunset; then
+            hyprsunset -t 4500 >/dev/null 2>&1 &
+        elif available wlsunset; then
+            wlsunset -T 4500 >/dev/null 2>&1 &
+        else
+            exit 3
+        fi
+        ;;
+    power-profile)
+        available powerprofilesctl || exit 3
+        powerprofilesctl set "${2:?expected profile}"
+        ;;
+    *)
+        exit 2
+        ;;
+esac

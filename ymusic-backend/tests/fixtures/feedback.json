@@ -1,0 +1,11 @@
+{
+  "from": "fixture-from",
+  "batchId": "batch-fixture",
+  "event": {
+    "type": "skip",
+    "timestamp": "2026-08-23T12:34:56.789Z",
+    "trackId": "42:9",
+    "totalPlayedSeconds": 1.25,
+    "trackLengthSeconds": 180.0
+  }
+}

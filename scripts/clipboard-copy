@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+entry_id="${1:-}"
+[[ "$entry_id" =~ ^[0-9]+$ ]] || exit 2
+
+cliphist decode "$entry_id" | wl-copy

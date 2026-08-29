@@ -1,0 +1,4 @@
+{
+  "invocationInfo": {"req-id": "fixture"},
+  "result": [{"id": "123", "title": "Fixture Song"}]
+}

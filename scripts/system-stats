@@ -1,0 +1,34 @@
+#!/bin/sh
+
+runtime_dir="${XDG_RUNTIME_DIR:-/tmp}"
+cache="$runtime_dir/qanda-shell-cpu"
+
+read -r _ user nice system idle iowait irq softirq steal _ < /proc/stat
+total=$((user + nice + system + idle + iowait + irq + softirq + steal))
+idle_total=$((idle + iowait))
+
+if [ -r "$cache" ]; then
+    read -r previous_total previous_idle < "$cache"
+    delta_total=$((total - previous_total))
+    delta_idle=$((idle_total - previous_idle))
+    if [ "$delta_total" -gt 0 ]; then
+        cpu=$(((delta_total - delta_idle) * 100 / delta_total))
+    else
+        cpu=0
+    fi
+else
+    cpu=$(((total - idle_total) * 100 / total))
+fi
+printf '%s %s\n' "$total" "$idle_total" > "$cache"
+
+mem_total=0
+mem_available=0
+while read -r key value _; do
+    case "$key" in
+        MemTotal:) mem_total=$value ;;
+        MemAvailable:) mem_available=$value ;;
+    esac
+done < /proc/meminfo
+
+memory=$(((mem_total - mem_available) * 100 / mem_total))
+printf '%s %s\n' "$cpu" "$memory"

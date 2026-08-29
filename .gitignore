@@ -1,0 +1,7 @@
+/.superpowers/
+/.opencode/node_modules/
+/.opencode/package-lock.json
+/.opencode/package.json
+/backend/target/
+/docs/superpowers/
+/ymusic-backend/target/

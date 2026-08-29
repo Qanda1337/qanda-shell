@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+
+set -uo pipefail
+
+tron_address="${1:-}"
+evm_address="${2:-}"
+usdt_contract="TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
+
+if [[ "$tron_address" =~ ^T[1-9A-HJ-NP-Za-km-z]{33}$ ]] \
+        && tron_response="$(curl --fail --silent --show-error --max-time 12 \
+            "https://api.trongrid.io/v1/accounts/${tron_address}" 2>/dev/null)"; then
+    tron_data="$(jq --arg contract "$usdt_contract" '
+        {
+            ok: (.success == true and (.data | length) > 0),
+            usdt: ((([.data[0].trc20[]? | .[$contract] // empty] | first) // "0") | tonumber) / 1000000,
+            trx: ((.data[0].balance // 0) | tonumber) / 1000000
+        }
+    ' <<<"$tron_response")"
+else
+    tron_data='{"ok":false,"usdt":0,"trx":0}'
+fi
+
+if [[ "$evm_address" =~ ^0x[0-9a-fA-F]{40}$ ]]; then
+    request_body="$(jq -nc --arg user "$evm_address" '{type:"clearinghouseState", user:$user}')"
+    if hyper_response="$(curl --fail --silent --show-error --max-time 12 \
+        -H "Content-Type: application/json" \
+        -d "$request_body" \
+        "https://api.hyperliquid.xyz/info" 2>/dev/null)"; then
+        hyper_data="$(jq '
+            {
+                configured: true,
+                ok: (.marginSummary != null),
+                accountValue: ((.marginSummary.accountValue // "0") | tonumber),
+                withdrawable: ((.withdrawable // "0") | tonumber),
+                unrealizedPnl: ([.assetPositions[]?.position.unrealizedPnl // "0" | tonumber] | add // 0),
+                positions: [
+                    .assetPositions[]?.position
+                    | select(((.szi // "0") | tonumber) != 0)
+                    | {
+                        coin: (.coin // ""),
+                        side: (if ((.szi // "0") | tonumber) > 0 then "LONG" else "SHORT" end),
+                        size: (((.szi // "0") | tonumber) | fabs),
+                        entryPrice: ((.entryPx // "0") | tonumber),
+                        value: ((.positionValue // "0") | tonumber),
+                        pnl: ((.unrealizedPnl // "0") | tonumber),
+                        roe: ((.returnOnEquity // "0") | tonumber) * 100,
+                        liquidationPrice: ((.liquidationPx // "0") | tonumber)
+                    }
+                ]
+            }
+        ' <<<"$hyper_response")"
+    else
+        hyper_data='{"configured":true,"ok":false,"accountValue":0,"withdrawable":0,"unrealizedPnl":0,"positions":[]}'
+    fi
+else
+    hyper_data='{"configured":false,"ok":false,"accountValue":0,"withdrawable":0,"unrealizedPnl":0,"positions":[]}'
+fi
+
+jq -nc --argjson tron "$tron_data" --argjson hyperliquid "$hyper_data" \
+    '{tron:$tron, hyperliquid:$hyperliquid}'

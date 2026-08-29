@@ -1,0 +1,5 @@
+#!/bin/sh
+
+qs kill -c qanda-shell 2>/dev/null || true
+sleep 1
+exec qs -c qanda-shell
