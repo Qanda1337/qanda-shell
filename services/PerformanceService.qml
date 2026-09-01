@@ -84,7 +84,7 @@ Item {
 
     Timer {
         interval: 1500
-        running: root.isOpen && !root.systemService.backendConnected
+        running: !root.systemService.backendConnected
         repeat: true
         onTriggered: root.refresh()
     }

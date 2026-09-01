@@ -259,6 +259,7 @@ PanelWindow {
         systemService: root.systemService
         audioService: root.audioService
         powerService: root.powerService
+        performanceService: root.performanceService
         quickSettingsService: root.quickSettingsService
         settingsService: root.settingsService
         quickSettingsHoverAllowed: !root.anyOtherWidgetOpen

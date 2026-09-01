@@ -12,6 +12,7 @@ Item {
     required property var systemService
     required property var audioService
     required property var powerService
+    required property var performanceService
     required property var quickSettingsService
     required property var settingsService
     property bool concealed: false
@@ -43,13 +44,33 @@ Item {
     readonly property string networkPath: systemService.vpnConnected ? vpnPath
         : (systemService.networkType === "wifi" ? wifiPath : wiredPath)
     readonly property string powerPath: "M8 0c-.550781 0-1 .449219-1 1v5c0 .550781.449219 1 1 1s1-.449219 1-1V1c0-.550781-.449219-1-1-1z M4.863281 1.816406c-.128906.015625-.253906.058594-.367187.125C1.761719 3.523438.421875 6.757812 1.238281 9.8125 2.058594 12.863281 4.832031 14.996094 7.988281 15c3.160157.003906 5.941407-2.121094 6.765625-5.167969.828125-3.050781-.5-6.289062-3.230468-7.878906-.476563-.28125-1.089844-.121094-1.367188.359375-.132812.226562-.171875.5-.105469.757812.070313.257813.234375.476563.464844.609376 1.957031 1.140624 2.902344 3.441406 2.3125 5.628906-.59375 2.183594-2.570313 3.695312-4.832031 3.691406-2.265625-.003906-4.238282-1.519531-4.824219-3.707031s.363281-4.488281 2.324219-5.621094c.476562-.277344.640625-.886719.363281-1.363281-.132813-.230469-.347656-.398438-.605469-.464844-.125-.035156-.257812-.042969-.390625-.027344z"
+    readonly property string memoryPath: "M0 13c0 .554.446 1 1 1h5v-2H0zm0-2h16V8a1 1 0 0 0-2 0v1H2V8a1 1 0 0 0-2 0zm0-5a1 1 0 0 0 2 0V5h2v4h2V5h2v4h2V5h2v4h2V5h2v1a1 1 0 0 0 2 0V4c0-.554-.446-1-1-1H1C.446 3 0 3.446 0 4zm8 8h8v-2H8z"
+
+    function usageColor(value) {
+        if (value > 90)
+            return Config.Theme.danger;
+        if (value > 80)
+            return Config.Theme.warning;
+        return Config.Theme.text;
+    }
+
+    function temperatureColor(value) {
+        if (value > 80)
+            return Config.Theme.danger;
+        if (value > 70)
+            return Config.Theme.warning;
+        return Config.Theme.text;
+    }
 
     component SystemIcon: Rectangle {
         id: iconButton
 
         property string glyph: ""
         property string pathData: ""
+        property string badge: ""
         property color glyphColor: Config.Theme.text
+        property real glyphSize: 15
+        property real pathSize: 16
         property bool interactive: true
         property bool shown: true
         property real revealProgress: 0
@@ -81,17 +102,30 @@ Item {
             text: iconButton.glyph
             color: iconButton.glyphColor
             font.family: Config.Theme.monoFont
-            font.pixelSize: 15
+            font.pixelSize: iconButton.glyphSize
             font.weight: Font.Bold
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             scale: 0.72 + iconButton.revealProgress * 0.28
         }
 
+        Text {
+            anchors.right: parent.right
+            anchors.rightMargin: 2
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 2
+            visible: iconButton.badge !== ""
+            text: iconButton.badge
+            color: iconButton.glyphColor
+            font.family: Config.Theme.monoFont
+            font.pixelSize: 8
+            font.weight: Font.Bold
+        }
+
         Shape {
             anchors.centerIn: parent
-            width: 16
-            height: 16
+            width: iconButton.pathSize
+            height: iconButton.pathSize
             visible: iconButton.pathData !== ""
             preferredRendererType: Shape.CurveRenderer
             scale: 0.72 + iconButton.revealProgress * 0.28
@@ -209,6 +243,48 @@ Item {
             glyph: systemService.themeMode === "light" ? "\uf185" : "\uf186"
             interactive: Config.Preferences.themeSource === "matugen"
             onTriggered: root.settingsService.toggleThemeMode()
+        }
+
+        SystemIcon {
+            shown: root.performanceService.cpuUsage > 60
+            glyph: "\uf2db"
+            glyphSize: 17
+            glyphColor: root.usageColor(root.performanceService.cpuUsage)
+            interactive: false
+        }
+
+        SystemIcon {
+            shown: root.performanceService.gpuUsage > 60
+            glyph: "\uf26c"
+            glyphSize: 17
+            glyphColor: root.usageColor(root.performanceService.gpuUsage)
+            interactive: false
+        }
+
+        SystemIcon {
+            shown: root.performanceService.memoryUsage > 60
+            pathData: root.memoryPath
+            pathSize: 17
+            glyphColor: root.usageColor(root.performanceService.memoryUsage)
+            interactive: false
+        }
+
+        SystemIcon {
+            shown: root.performanceService.cpuTemperature > 60
+            glyph: "\uf2c7"
+            glyphSize: 17
+            badge: "C"
+            glyphColor: root.temperatureColor(root.performanceService.cpuTemperature)
+            interactive: false
+        }
+
+        SystemIcon {
+            shown: root.performanceService.gpuTemperature > 60
+            glyph: "\uf2c7"
+            glyphSize: 17
+            badge: "G"
+            glyphColor: root.temperatureColor(root.performanceService.gpuTemperature)
+            interactive: false
         }
 
         SystemIcon {
