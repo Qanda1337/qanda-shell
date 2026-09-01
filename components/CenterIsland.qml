@@ -56,8 +56,10 @@ Item {
         || timerPanelOpen || clipboardPanelOpen || bindingsPanelOpen || dockerPanelOpen
         || powerPanelOpen || wallpaperPanelOpen || performancePanelOpen || walletPanelOpen
         || audioPanelOpen || mediaPanelOpen || weatherPanelOpen || notificationExpanded
+    readonly property bool floatingMode: Config.Preferences.centerModuleStyle === "floating"
     readonly property int compactWidth: timerService.active ? 250 : 214
-    readonly property real outerEar: 14
+    readonly property real outerEar: floatingMode ? 0 : 14
+    readonly property real floatingInset: 5
 
     Connections {
         target: root.notificationService
@@ -186,8 +188,8 @@ Item {
         autoPaddingEnabled: true
         shadowEnabled: true
         shadowColor: "#000000"
-        shadowOpacity: root.surfaceActive ? 0.58 : 0
-        shadowBlur: root.surfaceActive ? 0.72 : 0
+        shadowOpacity: root.surfaceActive ? 0.58 : (root.floatingMode ? 0.2 : 0)
+        shadowBlur: root.surfaceActive ? 0.72 : (root.floatingMode ? 0.42 : 0)
         blurMax: 36
         shadowVerticalOffset: root.surfaceActive ? 8 : 0
 
@@ -207,7 +209,18 @@ Item {
                 || root.performancePanelOpen || root.walletPanelOpen || root.audioPanelOpen
                 || root.mediaPanelOpen || root.weatherPanelOpen) ? 28
                 : (root.hoverExpanded ? 22 : 20)))
-        readonly property string outlinePath: ear > 0
+        readonly property real floatingRadius: Math.min(height / 2,
+            root.surfaceActive ? ((root.launcherOpen || root.calendarOpen) ? 28 : 24) : 14)
+        readonly property string outlinePath: root.floatingMode
+            ? `M ${floatingRadius} 0 L ${width - floatingRadius} 0`
+                + ` Q ${width} 0 ${width} ${floatingRadius}`
+                + ` L ${width} ${height - floatingRadius}`
+                + ` Q ${width} ${height} ${width - floatingRadius} ${height}`
+                + ` L ${floatingRadius} ${height}`
+                + ` Q 0 ${height} 0 ${height - floatingRadius}`
+                + ` L 0 ${floatingRadius}`
+                + ` Q 0 0 ${floatingRadius} 0 Z`
+            : ear > 0
             ? `M 0 0 Q ${ear} 0 ${ear} ${ear}`
                 + ` L ${ear} ${height - bottomRadius}`
                 + ` Q ${ear} ${height} ${ear + bottomRadius} ${height}`
@@ -220,10 +233,12 @@ Item {
                 + ` L ${bottomRadius} ${height}`
                 + ` Q 0 ${height} 0 ${height - bottomRadius} Z`
 
-        x: -ear
-        y: 0
-        width: parent.width + ear * 2
-        height: parent.height - 2
+        x: root.floatingMode ? 0 : -ear
+        y: root.floatingMode ? root.floatingInset - 1 : 0
+        width: root.floatingMode ? parent.width : parent.width + ear * 2
+        height: root.floatingMode
+            ? Math.max(0, parent.height - root.floatingInset * 2)
+            : parent.height - 2
         antialiasing: true
         preferredRendererType: Shape.CurveRenderer
 
@@ -264,6 +279,7 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
+        anchors.topMargin: root.floatingMode ? 2 : 0
         height: root.barHeight
         visible: opacity > 0
         opacity: root.notificationExpanded ? 1 : 0
@@ -274,7 +290,7 @@ Item {
 
         Row {
             anchors.left: parent.left
-            anchors.leftMargin: 16
+            anchors.leftMargin: root.floatingMode ? 32 : 16
             anchors.verticalCenter: parent.verticalCenter
             width: 166
             spacing: 8
@@ -338,7 +354,7 @@ Item {
 
         Column {
             anchors.right: parent.right
-            anchors.rightMargin: 16
+            anchors.rightMargin: root.floatingMode ? 32 : 16
             anchors.verticalCenter: parent.verticalCenter
             width: 120
             spacing: 0
@@ -412,6 +428,7 @@ Item {
 
                 Row {
                     anchors.centerIn: parent
+                    anchors.horizontalCenterOffset: root.floatingMode ? -7 : 0
                     spacing: 2
                     visible: root.musicPlaying && !timerService.active
 

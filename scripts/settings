@@ -15,6 +15,7 @@ defaults() {
         notificationDuration: 4000,
         showLeftCluster: true,
         showRightCluster: true,
+        centerModuleStyle: "liquid",
         themeSource: "matugen",
         themePreset: "catppuccin-mocha",
         matugenSource: "wallpaper",
@@ -52,6 +53,7 @@ case "${1:-}" in
             (.notificationDuration | type == "number" and floor == . and . >= 1000 and . <= 15000) and
             (.showLeftCluster | type == "boolean") and
             (.showRightCluster | type == "boolean") and
+            (.centerModuleStyle | IN("liquid", "floating")) and
             (.themeSource | IN("matugen", "preset")) and
             (.themePreset | IN("catppuccin-mocha", "gruvbox-dark", "kanagawa-wave", "tokyo-night", "nord", "rose-pine", "everforest", "dracula")) and
             (.matugenSource | IN("wallpaper", "color")) and

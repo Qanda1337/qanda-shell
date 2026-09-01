@@ -741,6 +741,16 @@ FocusScope {
                     showSwitch: true
                     onTriggered: root.immersiveService.toggle()
                 }
+                BinaryChoiceRow {
+                    width: parent.width
+                    icon: "\uf2d0"
+                    title: "Центральный модуль"
+                    firstLabel: "Liquid"
+                    secondLabel: "Floating"
+                    secondSelected: Config.Preferences.centerModuleStyle === "floating"
+                    onSelected: second => Config.Preferences.updateCenterModuleStyle(
+                        second ? "floating" : "liquid")
+                }
                 ControlCard {
                     width: parent.width
                     icon: "\uf135"; title: "Анимации"; detail: Config.Preferences.animationsEnabled ? "Включены" : "Отключены"

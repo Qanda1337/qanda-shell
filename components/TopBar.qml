@@ -161,6 +161,7 @@ PanelWindow {
         height: 1
         color: Config.Theme.surfaceEdge
         visible: root.presentationActive && !root.immersiveActive
+            && !centerIsland.floatingMode
         opacity: 1
     }
 
@@ -171,6 +172,7 @@ PanelWindow {
         height: 1
         color: Config.Theme.surfaceEdge
         visible: root.presentationActive && !root.immersiveActive
+            && !centerIsland.floatingMode
         opacity: 1
     }
 

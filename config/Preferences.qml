@@ -14,6 +14,7 @@ QtObject {
 
     readonly property list<string> profiles: ["normal", "work", "game", "focus"]
     readonly property list<string> themeSources: ["matugen", "preset"]
+    readonly property list<string> centerModuleStyles: ["liquid", "floating"]
     readonly property var themePresets: [
         { id: "catppuccin-mocha", label: "Catppuccin" },
         { id: "gruvbox-dark", label: "Gruvbox" },
@@ -45,6 +46,7 @@ QtObject {
     property int notificationDuration: 4000
     property bool showLeftCluster: true
     property bool showRightCluster: true
+    property string centerModuleStyle: "liquid"
     property string themeSource: "matugen"
     property string themePreset: "catppuccin-mocha"
     property string matugenSource: "wallpaper"
@@ -154,6 +156,14 @@ QtObject {
     function updateShowRightCluster(value) {
         showRightCluster = Boolean(value);
         scheduleSave();
+    }
+
+    function updateCenterModuleStyle(value) {
+        if (!validChoice(value, centerModuleStyles))
+            return false;
+        centerModuleStyle = value;
+        scheduleSave();
+        return true;
     }
 
     function updateWeatherCity(value) {
@@ -301,6 +311,8 @@ QtObject {
                     root.showLeftCluster = data.showLeftCluster;
                 if (typeof data.showRightCluster === "boolean")
                     root.showRightCluster = data.showRightCluster;
+                if (root.validChoice(data.centerModuleStyle, root.centerModuleStyles))
+                    root.centerModuleStyle = data.centerModuleStyle;
                 if (root.validChoice(data.themeSource, root.themeSources))
                     root.themeSource = data.themeSource;
                 if (root.validChoice(data.themePreset, root.themePresetIds))
@@ -350,6 +362,7 @@ QtObject {
                 notificationDuration: root.notificationDuration,
                 showLeftCluster: root.showLeftCluster,
                 showRightCluster: root.showRightCluster,
+                centerModuleStyle: root.centerModuleStyle,
                 themeSource: root.themeSource,
                 themePreset: root.themePreset,
                 matugenSource: root.matugenSource,
